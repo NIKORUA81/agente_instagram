@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: Lint · Typecheck · Test · Build (Node)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://wolfiax:wolfiax_ci@localhost:5432/wolfiax
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Tests unitarios
+        run: pnpm test
+
+      - name: Crear rol de aplicación (sin superusuario, para RLS real)
+        run: |
+          psql "postgresql://postgres:postgres@localhost:5432/postgres" <<'SQL'
+          CREATE ROLE wolfiax LOGIN PASSWORD 'wolfiax_ci' NOSUPERUSER CREATEDB;
+          CREATE DATABASE wolfiax OWNER wolfiax;
+          SQL
+          psql "postgresql://postgres:postgres@localhost:5432/wolfiax" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+
+      - name: Migraciones
+        run: pnpm --filter @wolfiax/api exec prisma migrate deploy
+
+      - name: Tests e2e (auth + aislamiento multi-tenant)
+        run: pnpm --filter @wolfiax/api test:e2e
+
+      - name: Build
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+
+  python:
+    name: Lint · Test (ai-service)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/ai-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Pytest
+        run: pytest

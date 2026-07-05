@@ -1,0 +1,39 @@
+# Dependencias
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Builds
+dist/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Entorno (nunca commitear secretos)
+.env
+.env.local
+.env.*.local
+
+# Tests y cobertura
+coverage/
+.pytest_cache/
+
+# IDE / SO
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Prisma
+apps/api/prisma/*.db
+
+# Logs
+*.log
+
+# Config local de Claude Code
+.claude/settings.local.json
+
+# Artefactos de packaging Python
+*.egg-info/

@@ -1,0 +1,8 @@
+# Normaliza a LF en el repositorio (Docker, CI y Linux lo esperan)
+* text=auto eol=lf
+
+# Binarios
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
