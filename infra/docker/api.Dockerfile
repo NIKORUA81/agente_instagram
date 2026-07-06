@@ -26,7 +26,7 @@ RUN pnpm --filter @wolfiax/api deploy --prod /prod/api \
  && cp -r apps/api/prisma /prod/api/prisma
 # El cliente Prisma se genera dentro del deploy para que los engines queden en su sitio
 WORKDIR /prod/api
-RUN npx prisma generate
+RUN /repo/node_modules/.bin/prisma generate
 
 # ---- runner -----------------------------------------------------------------
 FROM node:22-bookworm-slim AS runner
