@@ -38,6 +38,8 @@ export class JwtAuthGuard implements CanActivate {
       organizationId: payload.org,
       role: payload.role,
       email: payload.email,
+      isPlatformAdmin: payload.pa === true,
+      impersonating: payload.imp === true,
     };
     return true;
   }

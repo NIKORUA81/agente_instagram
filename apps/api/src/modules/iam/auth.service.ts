@@ -101,7 +101,7 @@ export class AuthService {
         where: { email },
         include: {
           memberships: {
-            where: { organization: { deletedAt: null } },
+            where: { organization: { deletedAt: null, suspendedAt: null } },
             include: { organization: true },
             orderBy: { createdAt: 'asc' },
           },
@@ -215,7 +215,7 @@ export class AuthService {
         },
         include: { organization: true },
       });
-      if (!membership || membership.organization.deletedAt) {
+      if (!membership || membership.organization.deletedAt || membership.organization.suspendedAt) {
         await tx.refreshToken.update({
           where: { id: row.id },
           data: { revokedAt: new Date() },
@@ -303,7 +303,7 @@ export class AuthService {
         where: { organizationId_userId: { organizationId: targetOrgId, userId } },
         include: { organization: true },
       });
-      if (!membership || membership.organization.deletedAt) {
+      if (!membership || membership.organization.deletedAt || membership.organization.suspendedAt) {
         throw new AppError(
           HttpStatus.FORBIDDEN,
           ERROR_CODES.FORBIDDEN,
@@ -347,7 +347,7 @@ export class AuthService {
         where: { id: userId },
         include: {
           memberships: {
-            where: { organization: { deletedAt: null } },
+            where: { organization: { deletedAt: null, suspendedAt: null } },
             include: { organization: true },
             orderBy: { createdAt: 'asc' },
           },
@@ -369,6 +369,7 @@ export class AuthService {
       user: toUserDto(data),
       current_organization: toOrganizationDto(current.organization),
       current_role: currentRole,
+      is_platform_admin: data.isPlatformAdmin,
       organizations: data.memberships.map((m) => ({
         organization: toOrganizationDto(m.organization),
         role: m.role as Role,
@@ -541,6 +542,7 @@ export class AuthService {
       organizationId: organization.id,
       role,
       email: user.email,
+      isPlatformAdmin: user.isPlatformAdmin,
     });
     return {
       accessToken,

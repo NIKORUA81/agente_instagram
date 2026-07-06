@@ -6,6 +6,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { randomUUID } from 'node:crypto';
 import { JwtAuthGuard } from './common/auth/jwt-auth.guard';
+import { PlatformAdminGuard } from './common/auth/platform-admin.guard';
 import { RolesGuard } from './common/auth/roles.guard';
 import { GlobalExceptionFilter } from './common/errors/http-exception.filter';
 import { PrismaModule } from './common/prisma/prisma.module';
@@ -17,6 +18,7 @@ import { HealthModule } from './modules/health/health.module';
 import { IamModule } from './modules/iam/iam.module';
 import { InboxModule } from './modules/inbox/inbox.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
+import { PlatformModule } from './modules/platform/platform.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 
 @Module({
@@ -48,14 +50,16 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     MessagingModule,
     AutomationsModule,
     InboxModule,
+    PlatformModule,
     HealthModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
-    // Orden de guards: rate limit → autenticación → roles
+    // Orden de guards: rate limit → autenticación → roles → plataforma
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: PlatformAdminGuard },
   ],
 })
 export class AppModule {}

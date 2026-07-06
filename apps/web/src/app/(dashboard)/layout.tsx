@@ -7,6 +7,7 @@ import {
   Instagram,
   LogOut,
   Settings,
+  Shield,
   Users,
   Workflow,
   Zap,
@@ -30,7 +31,7 @@ const NAV = [
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { me, logout, switchOrg } = useAuth();
+  const { me, logout, switchOrg, impersonating, stopImpersonation } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -47,7 +48,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className={cn('flex min-h-screen', impersonating && 'pt-7')}>
+      {impersonating && (
+        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-3 bg-amber-500 px-4 py-1.5 text-xs font-medium text-amber-950">
+          <Shield className="size-3.5" />
+          Estás operando como Super Admin dentro de «{me.current_organization.name}».
+          <button
+            onClick={() => void stopImpersonation().then(() => router.replace('/platform'))}
+            className="rounded bg-amber-950/10 px-2 py-0.5 font-semibold hover:bg-amber-950/20"
+          >
+            Salir de impersonación
+          </button>
+        </div>
+      )}
       <aside className="flex w-64 flex-col border-r border-neutral-200 bg-white">
         <div className="border-b border-neutral-100 px-5 py-4">
           <p className="text-sm font-bold tracking-tight">
@@ -105,6 +118,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             );
           })}
+
+          {me.is_platform_admin && (
+            <>
+              <div className="my-2 border-t border-neutral-100" />
+              <Link
+                href="/platform"
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  pathname.startsWith('/platform')
+                    ? 'bg-amber-50 text-amber-700'
+                    : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900',
+                )}
+              >
+                <Shield className="size-4" />
+                Plataforma
+              </Link>
+            </>
+          )}
         </nav>
 
         <div className="border-t border-neutral-100 p-4">

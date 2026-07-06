@@ -23,12 +23,16 @@ export class TokensService {
     organizationId: string;
     role: Role;
     email: string;
+    isPlatformAdmin?: boolean;
+    impersonating?: boolean;
   }): Promise<string> {
     const payload: Omit<AccessTokenPayload, 'iat' | 'exp'> = {
       sub: input.userId,
       org: input.organizationId,
       role: input.role,
       email: input.email,
+      ...(input.isPlatformAdmin ? { pa: true } : {}),
+      ...(input.impersonating ? { imp: true } : {}),
     };
     return this.jwt.signAsync(payload, { expiresIn: this.accessTtlSeconds });
   }

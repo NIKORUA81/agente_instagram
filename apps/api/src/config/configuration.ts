@@ -37,6 +37,12 @@ const envSchema = z.object({
   META_IG_APP_SECRET: z.string().optional(),
   /** Verify token del webhook (elige un valor aleatorio y configúralo en Meta). */
   META_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
+
+  // --- Super Admin de plataforma (auto-seed al arrancar) ---
+  /** Si se definen email + password, el API crea/promueve ese Super Admin al iniciar. */
+  SUPERADMIN_EMAIL: z.string().email().optional(),
+  SUPERADMIN_PASSWORD: z.string().min(10).optional(),
+  SUPERADMIN_NAME: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

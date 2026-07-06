@@ -83,6 +83,8 @@ export interface MeDto {
   /** Organización activa según el access token actual. */
   current_organization: OrganizationDto;
   current_role: Role;
+  /** Staff de Wolfiax (Super Admin de plataforma). */
+  is_platform_admin: boolean;
   organizations: MembershipDto[];
 }
 
@@ -324,4 +326,64 @@ export interface WsMessageStatusPayload {
   message_id: string;
   status: string;
   error?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Super Admin de plataforma (staff Wolfiax)
+// ---------------------------------------------------------------------------
+
+export interface PlatformStatsDto {
+  organizations_total: number;
+  organizations_active: number;
+  organizations_suspended: number;
+  users_total: number;
+  platform_admins_total: number;
+  channels_total: number;
+  channels_active: number;
+  conversations_total: number;
+  messages_total: number;
+}
+
+export interface PlatformOrgDto {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string;
+  suspended: boolean;
+  created_at: string;
+  members_count: number;
+  channels_count: number;
+  conversations_count: number;
+}
+
+export interface PlatformOrgDetailDto extends PlatformOrgDto {
+  members: Array<{
+    user_id: string;
+    email: string;
+    full_name: string;
+    role: Role;
+    joined_at: string;
+  }>;
+  channels: Array<{
+    id: string;
+    ig_username: string;
+    status: string;
+    connection_type: string;
+  }>;
+}
+
+export interface PlatformUserDto {
+  id: string;
+  email: string;
+  full_name: string;
+  is_platform_admin: boolean;
+  created_at: string;
+  last_login_at: string | null;
+  organizations_count: number;
+}
+
+/** Respuesta de impersonación: token de acceso con scope al tenant objetivo. */
+export interface ImpersonateResponseDto {
+  access_token: string;
+  organization: OrganizationDto;
 }

@@ -10,6 +10,10 @@ export const ROLES_KEY = 'roles';
 /** Restringe un endpoint a los roles indicados (evaluado por RolesGuard). */
 export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);
 
+export const PLATFORM_ADMIN_KEY = 'platformAdmin';
+/** Restringe un endpoint a Super Admins de plataforma (evaluado por PlatformAdminGuard). */
+export const PlatformAdmin = () => SetMetadata(PLATFORM_ADMIN_KEY, true);
+
 /** Inyecta el AuthUser de la request en un parámetro del handler. */
 export const CurrentUser = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): AuthUser => {

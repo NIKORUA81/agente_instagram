@@ -8,6 +8,10 @@ export interface AccessTokenPayload {
   org: string;
   role: Role;
   email: string;
+  /** platform admin (staff Wolfiax) */
+  pa?: boolean;
+  /** el token es de una sesión de impersonación de un tenant */
+  imp?: boolean;
   iat?: number;
   exp?: number;
 }
@@ -18,6 +22,10 @@ export interface AuthUser {
   organizationId: string;
   role: Role;
   email: string;
+  /** true si es staff de plataforma (Super Admin de Wolfiax) */
+  isPlatformAdmin: boolean;
+  /** true si está operando dentro de un tenant vía impersonación */
+  impersonating: boolean;
 }
 
 export const REFRESH_COOKIE = 'wsai_rt';

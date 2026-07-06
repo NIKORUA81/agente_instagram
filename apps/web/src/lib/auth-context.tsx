@@ -1,12 +1,14 @@
 'use client';
 
-import type { AuthResponseDto, MeDto } from '@wolfiax/shared';
+import type { AuthResponseDto, ImpersonateResponseDto, MeDto } from '@wolfiax/shared';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api, setAccessToken, tryRefresh } from './api';
 
 interface AuthState {
   /** undefined = bootstrapping; null = sin sesión */
   me: MeDto | null | undefined;
+  /** true mientras un Super Admin opera dentro de un tenant impersonado */
+  impersonating: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (input: {
     email: string;
@@ -18,6 +20,10 @@ interface AuthState {
   switchOrg: (organizationId: string) => Promise<void>;
   /** Adopta una sesión emitida fuera del contexto (p. ej. aceptar invitación). */
   adoptSession: (auth: AuthResponseDto) => Promise<void>;
+  /** Super Admin: entra a un tenant con un token de impersonación. */
+  impersonate: (organizationId: string) => Promise<void>;
+  /** Vuelve a la sesión propia del Super Admin. */
+  stopImpersonation: () => Promise<void>;
   refreshMe: () => Promise<void>;
 }
 
@@ -25,6 +31,7 @@ const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [me, setMe] = useState<MeDto | null | undefined>(undefined);
+  const [impersonating, setImpersonating] = useState(false);
 
   const loadMe = useCallback(async () => {
     const profile = await api.get<MeDto>('/auth/me');
@@ -103,9 +110,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [loadMe],
   );
 
+  const impersonate = useCallback(
+    async (organizationId: string) => {
+      const res = await api.post<ImpersonateResponseDto>(
+        `/platform/organizations/${organizationId}/impersonate`,
+      );
+      setAccessToken(res.access_token);
+      setImpersonating(true);
+      await loadMe();
+    },
+    [loadMe],
+  );
+
+  const stopImpersonation = useCallback(async () => {
+    // La cookie de refresh sigue apuntando a la sesión propia del Super Admin
+    const ok = await tryRefresh();
+    setImpersonating(false);
+    if (ok) {
+      await loadMe();
+    } else {
+      setMe(null);
+    }
+  }, [loadMe]);
+
   return (
     <AuthContext.Provider
-      value={{ me, login, register, logout, switchOrg, adoptSession, refreshMe: loadMe }}
+      value={{
+        me,
+        impersonating,
+        login,
+        register,
+        logout,
+        switchOrg,
+        adoptSession,
+        impersonate,
+        stopImpersonation,
+        refreshMe: loadMe,
+      }}
     >
       {children}
     </AuthContext.Provider>
