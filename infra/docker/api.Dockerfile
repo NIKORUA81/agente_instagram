@@ -23,10 +23,8 @@ RUN pnpm --filter @wolfiax/shared build \
 # Copia deployable con solo dependencias de producción
 RUN pnpm --filter @wolfiax/api deploy --prod /prod/api \
  && cp -r apps/api/dist /prod/api/dist \
- && cp -r apps/api/prisma /prod/api/prisma
-# El cliente Prisma se genera dentro del deploy para que los engines queden en su sitio
-WORKDIR /prod/api
-RUN /repo/node_modules/.bin/prisma generate
+ && cp -r apps/api/prisma /prod/api/prisma \
+ && (cp -r apps/api/node_modules/.prisma /prod/api/node_modules/.prisma || cp -r node_modules/.prisma /prod/api/node_modules/.prisma)
 
 # ---- runner -----------------------------------------------------------------
 FROM node:22-bookworm-slim AS runner
