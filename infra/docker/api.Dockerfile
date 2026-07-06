@@ -25,10 +25,8 @@ RUN pnpm --filter @wolfiax/api deploy --prod /prod/api \
  && cp -r apps/api/dist /prod/api/dist \
  && cp -r apps/api/prisma /prod/api/prisma
 
-# Instalamos la CLI de Prisma de la misma versión en la carpeta de producción y generamos el cliente
-WORKDIR /prod/api
-RUN npm install --no-save prisma@6.3.0 \
- && ./node_modules/.bin/prisma generate
+# Generamos el cliente de Prisma para producción usando la CLI del workspace
+RUN pnpm --filter @wolfiax/api exec prisma generate --schema=/prod/api/prisma/schema.prisma
 
 # ---- runner -----------------------------------------------------------------
 FROM node:22-bookworm-slim AS runner
