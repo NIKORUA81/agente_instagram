@@ -17,16 +17,28 @@ RUN pnpm install --frozen-lockfile --filter @wolfiax/api... --filter @wolfiax/sh
 
 COPY packages/shared packages/shared
 COPY apps/api apps/api
+
+# 1. Genera el cliente Prisma con el target correcto (debian-openssl-3.0.x)
+#    Debe correr ANTES del deploy para que pnpm tenga acceso a la CLI de dev
 RUN pnpm --filter @wolfiax/shared build \
+ && pnpm --filter @wolfiax/api exec prisma generate \
  && pnpm --filter @wolfiax/api build
 
-# Copia deployable con solo dependencias de producción
+# 2. Crea el directorio de producción con solo dependencias de producción
 RUN pnpm --filter @wolfiax/api deploy --prod /prod/api \
  && cp -r apps/api/dist /prod/api/dist \
  && cp -r apps/api/prisma /prod/api/prisma
 
-# Generamos el cliente de Prisma para producción usando la CLI del workspace
-RUN pnpm --filter @wolfiax/api exec prisma generate --schema=/prod/api/prisma/schema.prisma
+# 3. Copia el cliente generado de Prisma al directorio de producción
+#    pnpm lo coloca en la tienda virtual; buscamos en todas las ubicaciones posibles
+RUN PRISMA_CLIENT_SRC=$(find /repo -path "*/.prisma/client" -type d 2>/dev/null | head -1) \
+ && if [ -n "$PRISMA_CLIENT_SRC" ]; then \
+      mkdir -p /prod/api/node_modules/.prisma/client; \
+      cp -r "$PRISMA_CLIENT_SRC"/. /prod/api/node_modules/.prisma/client/; \
+      echo "✅ Prisma client copiado desde $PRISMA_CLIENT_SRC"; \
+    else \
+      echo "⚠️ No se encontró .prisma/client — el cliente se buscará en runtime"; \
+    fi
 
 # ---- runner -----------------------------------------------------------------
 FROM node:22-bookworm-slim AS runner
