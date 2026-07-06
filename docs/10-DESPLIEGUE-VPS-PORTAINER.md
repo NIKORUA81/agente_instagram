@@ -42,14 +42,16 @@ El rol de la aplicación **no debe ser superusuario**: el aislamiento multi-tena
 
 ```sql
 -- 1. Rol de aplicación (elige una contraseña fuerte y guárdala en un gestor)
-CREATE ROLE wolfiax LOGIN PASSWORD 'CAMBIA-ESTA-CONTRASEÑA' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+CREATE ROLE wolfiax LOGIN PASSWORD 'Administrador2026' NOSUPERUSER NOCREATEDB NOCREATEROLE;
 
 -- 2. Base de datos propiedad del rol (owner ⇒ puede correr migraciones,
 --    pero FORCE ROW LEVEL SECURITY le aplica igual las políticas)
-CREATE DATABASE wolfiax OWNER wolfiax;
+CREATE DATABASE wolfiax_db OWNER wolfiax;
 ```
 
-Conéctate ahora a la BD `wolfiax` (no a postgres) y ejecuta:
+> Nombre de la BD: en este despliegue la base se llama **`wolfiax_db`** (así aparece en PgAdmin). Usa ese nombre de forma consistente en el `DATABASE_URL` (§6). Si en algún paso ves `wolfiax` a secas como nombre de BD, cámbialo por `wolfiax_db`.
+
+Conéctate ahora a la BD `wolfiax_db` (no a `postgres`) y ejecuta:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -61,7 +63,16 @@ Verificación de seguridad (debe devolver `f` en ambas columnas):
 SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'wolfiax';
 ```
 
-**Red:** el contenedor de la app debe alcanzar a Postgres. Si tu Postgres está en una red Docker (p. ej. la de Portainer), anota el nombre de esa red y el nombre del contenedor; la `DATABASE_URL` usará `postgresql://wolfiax:PASS@<nombre-contenedor-postgres>:5432/wolfiax` y el stack de la app se unirá a esa red externa (§6).
+> **⚠️ Percent-encoding de la contraseña en el `DATABASE_URL`.**
+> La contraseña viaja dentro de una URL, así que los caracteres reservados
+> (`@ : / ? # [ ] % & + espacio`) **deben ir codificados**. La contraseña de
+> este despliegue, `Administrador2026`, es **solo alfanumérica → NO requiere
+> codificación**, se pega tal cual. Pero si algún día la cambias por una con
+> símbolos, codifícala: por ejemplo `P@ss/w0rd+` se escribiría
+> `P%40ss%2Fw0rd%2B` (`@`→`%40`, `/`→`%2F`, `+`→`%2B`). Un error de encoding
+> se manifiesta como `P1000 Authentication failed`.
+
+**Red:** el contenedor de la app debe alcanzar a Postgres. Si tu Postgres está en una red Docker (p. ej. la de Portainer), anota el nombre de esa red y el nombre del contenedor; la `DATABASE_URL` usará `postgresql://wolfiax:Administrador2026@<nombre-contenedor-postgres>:5432/wolfiax_db` y el stack de la app se unirá a esa red externa (§6).
 
 ## 3. Redis (stack nuevo en Portainer)
 
@@ -198,20 +209,42 @@ networks:
 
 | Variable | Cómo obtenerla |
 |---|---|
-| `DATABASE_URL` | `postgresql://wolfiax:PASS@<contenedor-postgres>:5432/wolfiax` (§2). Si Postgres está en OTRA red Docker, añade esa red al servicio api también. |
+| `DATABASE_URL` | `postgresql://wolfiax:Administrador2026@<contenedor-postgres>:5432/wolfiax_db?schema=public` (§2). Nombre de BD `wolfiax_db`. Si Postgres está en OTRA red Docker, añade esa red al servicio api también. |
 | `REDIS_URL` | `redis://:REDIS_PASSWORD@redis:6379` (§3) |
 | `JWT_PRIVATE/PUBLIC_KEY_BASE64`, `TOKEN_ENC_KEY_BASE64`, `META_WEBHOOK_VERIFY_TOKEN` | En tu PC: `node infra/scripts/generate-jwt-keys.mjs` → **claves DISTINTAS a las de desarrollo** |
 | `META_*` | Panel de developers.facebook.com (§8) |
 
 ## 7. Migraciones de base de datos
 
-Tras el primer deploy (y tras cada versión con migraciones nuevas), en Portainer → contenedor `api` → Console (`/bin/sh`):
+**La imagen aplica las migraciones automáticamente al arrancar** (entrypoint
+`docker-entrypoint.sh` → `prisma migrate deploy` → arranca el API). No tienes
+que hacer nada manual: cada vez que redespliegas una versión con migraciones
+nuevas, se aplican solas antes de que el API empiece a escuchar. Si la BD no
+está lista, el contenedor sale con error y `restart: unless-stopped` reintenta.
 
-```sh
-./node_modules/.bin/prisma migrate deploy
+> Puedes desactivar la auto-migración en un contenedor concreto (p. ej. una
+> futura réplica de solo-worker) poniendo la variable `RUN_MIGRATIONS=false`.
+
+Para verlo, en Portainer → contenedor `api` → **Logs** debe aparecer al inicio
+algo como `Aplicando migraciones…` seguido de las migraciones aplicadas
+(`init_iam`, `channels_inbox`, `inbox_tools_automations`).
+
+Verificación en PgAdmin de que el RLS está activo (deben devolver ambas `t`):
+
+```sql
+SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = 'conversations';
 ```
 
-Debe listar las migraciones aplicadas (`init_iam`, `channels_inbox`, …). Verifica en PgAdmin que las tablas tienen RLS: `SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname='conversations';` → ambas `t`.
+### Alternativa manual (sin redesplegar)
+
+Si necesitas correr migraciones sin reconstruir la imagen, desde la consola del
+contenedor `api` (`/bin/sh`, en `/app`):
+
+```sh
+corepack pnpm dlx prisma@6.19.3 migrate deploy --schema=prisma/schema.prisma
+```
+
+(Requiere salida a internet del contenedor para descargar la CLI temporalmente.)
 
 ## 8. Configurar la app de Meta para producción
 

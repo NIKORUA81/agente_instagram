@@ -1,6 +1,9 @@
 # Normaliza a LF en el repositorio (Docker, CI y Linux lo esperan)
 * text=auto eol=lf
 
+# Los scripts de shell SIEMPRE en LF (un CRLF rompe el shebang en Linux)
+*.sh text eol=lf
+
 # Binarios
 *.png binary
 *.jpg binary

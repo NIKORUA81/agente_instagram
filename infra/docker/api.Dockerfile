@@ -47,11 +47,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl curl \
  && useradd --system --uid 1001 nodeapp
 WORKDIR /app
 COPY --from=build --chown=nodeapp:nodeapp /prod/api /app
+# Entrypoint que aplica migraciones antes de arrancar (prisma va en dependencies
+# de producción, así que ./node_modules/.bin/prisma existe en la imagen).
+COPY --from=build --chown=nodeapp:nodeapp /repo/apps/api/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 USER nodeapp
 ENV NODE_ENV=production PORT=4000
 EXPOSE 4000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s \
   CMD curl -fsS http://localhost:4000/healthz || exit 1
 # MODE distingue roles futuros (api | webhook | worker) con la misma imagen
 ENV MODE=api
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["node", "dist/main.js"]
