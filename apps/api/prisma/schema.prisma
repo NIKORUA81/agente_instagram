@@ -24,8 +24,12 @@ model Organization {
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships Membership[]
-  invitations Invitation[]
+  memberships   Membership[]
+  invitations   Invitation[]
+  channels      Channel[]
+  contacts      Contact[]
+  conversations Conversation[]
+  messages      Message[]
 
   @@map("organizations")
 }
@@ -40,9 +44,11 @@ model User {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships     Membership[]
-  refreshTokens   RefreshToken[]
-  invitationsSent Invitation[]   @relation("InvitedBy")
+  memberships           Membership[]
+  refreshTokens         RefreshToken[]
+  invitationsSent       Invitation[]   @relation("InvitedBy")
+  assignedConversations Conversation[] @relation("AssignedAgent")
+  sentMessages          Message[]      @relation("SentBy")
 
   @@map("users")
 }
@@ -114,4 +120,130 @@ model AuditLog {
 
   @@index([organizationId, createdAt])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// F1 - Canales (conexion Meta) e Inbox
+// ---------------------------------------------------------------------------
+
+model Channel {
+  id                String    @id @default(uuid()) @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  type              String    @default("instagram")
+  connectionType    String    @map("connection_type")
+  igUserId          String    @unique @map("ig_user_id")
+  igUsername        String    @map("ig_username")
+  fbPageId          String?   @map("fb_page_id")
+  accessTokenEnc    Bytes     @map("access_token_enc")
+  tokenExpiresAt    DateTime? @map("token_expires_at") @db.Timestamptz(6)
+  grantedScopes     String[]  @map("granted_scopes")
+  status            String    @default("active")
+  lastHealthCheckAt DateTime? @map("last_health_check_at") @db.Timestamptz(6)
+  webhookSubscribed Boolean   @default(false) @map("webhook_subscribed")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacts      Contact[]
+  conversations Conversation[]
+  webhookEvents WebhookEvent[]
+
+  @@index([organizationId])
+  @@map("channels")
+}
+
+model WebhookEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  channelId   String?   @map("channel_id") @db.Uuid
+  externalId  String    @map("external_id")
+  eventType   String    @map("event_type")
+  payload     Json
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
+  error       String?
+  receivedAt  DateTime  @default(now()) @map("received_at") @db.Timestamptz(6)
+
+  channel Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+
+  @@unique([externalId, eventType])
+  @@index([receivedAt])
+  @@map("webhook_events")
+}
+
+model Contact {
+  id            String   @id @default(uuid()) @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
+  channelId     String   @map("channel_id") @db.Uuid
+  igScopedId    String   @map("ig_scoped_id")
+  username      String?
+  name          String?
+  profilePicUrl String?  @map("profile_pic_url")
+  isFollower    Boolean? @map("is_follower")
+  lifecycle     String   @default("new")
+  extracted     Json     @default("{}")
+  firstSeenAt   DateTime @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt    DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channel       Channel        @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@unique([channelId, igScopedId])
+  @@index([organizationId])
+  @@map("contacts")
+}
+
+model Conversation {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  channelId       String    @map("channel_id") @db.Uuid
+  contactId       String    @map("contact_id") @db.Uuid
+  status          String    @default("open")
+  mode            String    @default("human")
+  assignedUserId  String?   @map("assigned_user_id") @db.Uuid
+  windowExpiresAt DateTime? @map("window_expires_at") @db.Timestamptz(6)
+  lastMessageAt   DateTime? @map("last_message_at") @db.Timestamptz(6)
+  lastInboundAt   DateTime? @map("last_inbound_at") @db.Timestamptz(6)
+  firstResponseMs Int?      @map("first_response_ms")
+  aiSummary       String?   @map("ai_summary")
+  sentiment       String?
+  language        String?
+  intent          String?
+  csatScore       Int?      @map("csat_score") @db.SmallInt
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channel      Channel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  assignedUser User?        @relation("AssignedAgent", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  messages     Message[]
+
+  @@unique([channelId, contactId])
+  @@index([organizationId, channelId, status, lastMessageAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  direction      String
+  source         String
+  mid            String?  @unique
+  type           String   @default("text")
+  text           String?
+  attachments    Json     @default("[]")
+  replyToStory   Json?    @map("reply_to_story")
+  status         String   @default("received")
+  error          String?
+  sentByUserId   String?  @map("sent_by_user_id") @db.Uuid
+  aiMeta         Json?    @map("ai_meta")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sentBy       User?        @relation("SentBy", fields: [sentByUserId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@map("messages")
 }

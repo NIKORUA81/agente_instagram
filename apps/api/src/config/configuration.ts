@@ -18,6 +18,25 @@ const envSchema = z.object({
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   SWAGGER_ENABLED: boolString,
+
+  // --- F1: rol del proceso, Redis, cifrado y Meta ---
+  MODE: z.enum(['api', 'webhook', 'worker']).default('api'),
+  REDIS_URL: z.string().default('redis://localhost:6379'),
+  /** URL pública de la API (redirect_uri de OAuth). */
+  API_PUBLIC_URL: z.string().url().default('http://localhost:4000'),
+  /** 32 bytes en base64 — AES-256-GCM para tokens de Meta en reposo. */
+  TOKEN_ENC_KEY_BASE64: z
+    .string()
+    .min(1, 'Genera la clave con infra/scripts/generate-jwt-keys.mjs'),
+  META_GRAPH_VERSION: z.string().default('v23.0'),
+  /** App de Facebook (vía facebook_login). Opcionales hasta conectar canales. */
+  META_APP_ID: z.string().optional(),
+  META_APP_SECRET: z.string().optional(),
+  /** App de Instagram (vía instagram_login). */
+  META_IG_APP_ID: z.string().optional(),
+  META_IG_APP_SECRET: z.string().optional(),
+  /** Verify token del webhook (elige un valor aleatorio y configúralo en Meta). */
+  META_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

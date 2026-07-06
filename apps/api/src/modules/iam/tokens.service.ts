@@ -44,4 +44,51 @@ export class TokensService {
       );
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // State de OAuth con Meta (anti-CSRF del flujo de conexión, un solo uso lógico)
+  // ---------------------------------------------------------------------------
+
+  signOAuthState(input: {
+    organizationId: string;
+    userId: string;
+    connectionType: 'instagram_login' | 'facebook_login';
+  }): Promise<string> {
+    return this.jwt.signAsync(
+      {
+        purpose: 'meta_oauth',
+        org: input.organizationId,
+        sub: input.userId,
+        ct: input.connectionType,
+      },
+      { expiresIn: 600 },
+    );
+  }
+
+  async verifyOAuthState(state: string): Promise<{
+    organizationId: string;
+    userId: string;
+    connectionType: 'instagram_login' | 'facebook_login';
+  }> {
+    try {
+      const payload = await this.jwt.verifyAsync<{
+        purpose?: string;
+        org: string;
+        sub: string;
+        ct: 'instagram_login' | 'facebook_login';
+      }>(state);
+      if (payload.purpose !== 'meta_oauth') throw new Error('purpose inválido');
+      return {
+        organizationId: payload.org,
+        userId: payload.sub,
+        connectionType: payload.ct,
+      };
+    } catch {
+      throw new AppError(
+        HttpStatus.UNAUTHORIZED,
+        ERROR_CODES.UNAUTHORIZED,
+        'El state de OAuth es inválido o expiró. Reinicia la conexión.',
+      );
+    }
+  }
 }

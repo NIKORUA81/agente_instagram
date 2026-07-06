@@ -5,7 +5,7 @@
  *
  *   node infra/scripts/generate-jwt-keys.mjs
  */
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -16,3 +16,5 @@ const { privateKey, publicKey } = generateKeyPairSync('rsa', {
 console.log('# Pega estas líneas en apps/api/.env (NUNCA las commitees):\n');
 console.log(`JWT_PRIVATE_KEY_BASE64=${Buffer.from(privateKey).toString('base64')}`);
 console.log(`JWT_PUBLIC_KEY_BASE64=${Buffer.from(publicKey).toString('base64')}`);
+console.log(`TOKEN_ENC_KEY_BASE64=${randomBytes(32).toString('base64')}`);
+console.log(`META_WEBHOOK_VERIFY_TOKEN=${randomBytes(24).toString('base64url')}`);

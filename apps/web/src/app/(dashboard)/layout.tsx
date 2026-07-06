@@ -4,6 +4,7 @@ import {
   BarChart3,
   BookOpen,
   Inbox,
+  Instagram,
   LogOut,
   Settings,
   Users,
@@ -19,11 +20,12 @@ import { cn, ROLE_LABELS } from '@/lib/utils';
 
 const NAV = [
   { href: '/dashboard', label: 'Inicio', icon: BarChart3, enabled: true },
-  { href: '/inbox', label: 'Inbox', icon: Inbox, enabled: false, phase: 'F1' },
-  { href: '/contacts', label: 'Contactos', icon: Users, enabled: false, phase: 'F1' },
+  { href: '/inbox', label: 'Inbox', icon: Inbox, enabled: true },
+  { href: '/contacts', label: 'Contactos', icon: Users, enabled: false, phase: 'F2' },
   { href: '/automations', label: 'Automatizaciones', icon: Zap, enabled: false, phase: 'F2' },
   { href: '/knowledge', label: 'Conocimiento', icon: BookOpen, enabled: false, phase: 'F3' },
   { href: '/flows', label: 'Flujos', icon: Workflow, enabled: false, phase: 'F4' },
+  { href: '/settings/channels', label: 'Canales', icon: Instagram, enabled: true },
   { href: '/settings/team', label: 'Equipo', icon: Settings, enabled: true },
 ];
 
