@@ -230,6 +230,9 @@ export interface ConversationDto {
   window_expires_at: string | null;
   last_message_at: string | null;
   created_at: string;
+  /** F2 */
+  assigned_user_id: string | null;
+  tags: TagDto[];
 }
 
 export interface PaginatedDto<T> {
@@ -241,6 +244,7 @@ export interface PaginatedDto<T> {
 /** Eventos WebSocket (namespace /realtime, sala org:{id}) */
 export const WS_EVENTS = {
   MESSAGE_NEW: 'message.new',
+  MESSAGE_STATUS: 'message.status',
   CONVERSATION_UPDATED: 'conversation.updated',
   CHANNEL_STATUS: 'channel.status',
 } as const;
@@ -248,4 +252,76 @@ export const WS_EVENTS = {
 export interface WsMessageNewPayload {
   conversation_id: string;
   message: MessageDto;
+}
+
+// ---------------------------------------------------------------------------
+// F2 - Etiquetas, notas, envio y automatizaciones
+// ---------------------------------------------------------------------------
+
+export interface TagDto {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface NoteDto {
+  id: string;
+  conversation_id: string;
+  body: string;
+  user_id: string;
+  user_name: string;
+  created_at: string;
+}
+
+export interface SendMessageRequest {
+  text?: string;
+  /** Envio de media por URL publica (image|video|audio) */
+  attachment_type?: 'image' | 'video' | 'audio';
+  attachment_url?: string;
+}
+
+export const AUTOMATION_TRIGGER_TYPES = [
+  'any_message',
+  'keyword',
+  'story_reply',
+  'reaction',
+  'new_contact',
+] as const;
+export type AutomationTriggerType = (typeof AUTOMATION_TRIGGER_TYPES)[number];
+
+export type AutomationTrigger =
+  | { type: 'any_message' }
+  | { type: 'keyword'; keywords: string[]; match?: 'contains' | 'exact' }
+  | { type: 'story_reply' }
+  | { type: 'reaction' }
+  | { type: 'new_contact' };
+
+export const AUTOMATION_ACTION_TYPES = ['reply', 'add_tag', 'assign', 'set_status'] as const;
+export type AutomationActionType = (typeof AUTOMATION_ACTION_TYPES)[number];
+
+export type AutomationAction =
+  | { type: 'reply'; text: string }
+  | { type: 'add_tag'; tag_id: string }
+  | { type: 'assign'; user_id: string }
+  | { type: 'set_status'; status: ConversationStatus };
+
+export interface AutomationDto {
+  id: string;
+  name: string;
+  channel_id: string | null;
+  enabled: boolean;
+  trigger: AutomationTrigger;
+  actions: AutomationAction[];
+  priority: number;
+  cooldown_seconds: number;
+  fire_count: number;
+  last_fired_at: string | null;
+  created_at: string;
+}
+
+export interface WsMessageStatusPayload {
+  conversation_id: string;
+  message_id: string;
+  status: string;
+  error?: string | null;
 }

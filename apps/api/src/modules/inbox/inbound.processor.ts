@@ -14,10 +14,11 @@ import { TokenCipherService } from '../../common/crypto/token-cipher.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { QUEUE_NAMES, REDIS_OPTIONS } from '../../common/queue/queue.module';
 import type { Env } from '../../config/configuration';
+import { AutomationsEngine } from '../automations/automations.engine';
 import { MetaGraphService } from '../channels/meta-graph.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import type { MetaMessagingEvent } from '../webhooks/meta-webhook.types';
 import { toConversationDto, toMessageDto } from './inbox.mappers';
-import { RealtimeGateway } from './realtime.gateway';
 
 interface InboundJobData {
   webhookEventId: string;
@@ -42,6 +43,7 @@ export class InboundProcessor implements OnModuleInit, OnApplicationShutdown {
     private readonly graph: MetaGraphService,
     private readonly cipher: TokenCipherService,
     private readonly gateway: RealtimeGateway,
+    private readonly automations: AutomationsEngine,
     private readonly config: ConfigService<Env, true>,
     @Inject(REDIS_OPTIONS) private readonly redisOptions: RedisOptions,
   ) {}
@@ -189,6 +191,17 @@ export class InboundProcessor implements OnModuleInit, OnApplicationShutdown {
         WS_EVENTS.CONVERSATION_UPDATED,
         toConversationDto({ ...result.conversation, messages: [result.message] }),
       );
+
+      // Motor de automatizaciones: solo sobre mensajes ENTRANTES del usuario
+      // (nunca sobre echoes del propio negocio, para no auto-dispararse).
+      if (!isEcho) {
+        await this.automations.evaluate({
+          channel,
+          conversation: result.conversation,
+          message: result.message,
+          isNewContact: !existingContact,
+        });
+      }
     }
   }
 

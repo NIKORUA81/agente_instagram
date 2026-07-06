@@ -1,9 +1,10 @@
-import type { Contact, Conversation, Message } from '@prisma/client';
+import type { Contact, Conversation, ConversationTag, Message, Tag } from '@prisma/client';
 import type {
   ContactDto,
   ConversationDto,
   MessageAttachmentDto,
   MessageDto,
+  TagDto,
 } from '@wolfiax/shared';
 
 export function toContactDto(contact: Contact): ContactDto {
@@ -34,8 +35,16 @@ export function toMessageDto(message: Message): MessageDto {
   };
 }
 
+export function toTagDto(tag: Tag): TagDto {
+  return { id: tag.id, name: tag.name, color: tag.color };
+}
+
 export function toConversationDto(
-  conversation: Conversation & { contact: Contact; messages?: Message[] },
+  conversation: Conversation & {
+    contact: Contact;
+    messages?: Message[];
+    tags?: Array<ConversationTag & { tag: Tag }>;
+  },
 ): ConversationDto {
   const last = conversation.messages?.[0] ?? null;
   const window =
@@ -52,6 +61,8 @@ export function toConversationDto(
     window_expires_at: window,
     last_message_at: conversation.lastMessageAt?.toISOString() ?? null,
     created_at: conversation.createdAt.toISOString(),
+    assigned_user_id: conversation.assignedUserId,
+    tags: conversation.tags?.map((ct) => toTagDto(ct.tag)) ?? [],
   };
 }
 

@@ -167,6 +167,37 @@ export class MetaGraphService {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Envío de mensajes (Messaging API oficial)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Envía un mensaje al usuario (IGSID). Solo se llama con la ventana de 24h
+   * abierta — la validación de ventana vive en MessagingService.
+   */
+  async sendMessage(input: {
+    connectionType: 'instagram_login' | 'facebook_login';
+    token: string;
+    recipientIgsid: string;
+    text?: string;
+    attachment?: { type: 'image' | 'video' | 'audio'; url: string };
+  }): Promise<{ message_id?: string }> {
+    const host =
+      input.connectionType === 'instagram_login' ? 'graph.instagram.com' : 'graph.facebook.com';
+    const message = input.attachment
+      ? { attachment: { type: input.attachment.type, payload: { url: input.attachment.url } } }
+      : { text: input.text ?? '' };
+
+    return this.request<{ message_id?: string }>(
+      `https://${host}/${this.version}/me/messages?access_token=${encodeURIComponent(input.token)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient: { id: input.recipientIgsid }, message }),
+      },
+    );
+  }
+
   /** Sondeo barato de salud para canales facebook_login (lanza si el token murió). */
   async fbProbeIgAccount(igUserId: string, pageToken: string): Promise<void> {
     const params = new URLSearchParams({ fields: 'username', access_token: pageToken });
