@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -30,6 +31,8 @@ model Organization {
   contacts      Contact[]
   conversations Conversation[]
   messages      Message[]
+  tags          Tag[]
+  automations   Automation[]
 
   @@map("organizations")
 }
@@ -49,6 +52,7 @@ model User {
   invitationsSent       Invitation[]   @relation("InvitedBy")
   assignedConversations Conversation[] @relation("AssignedAgent")
   sentMessages          Message[]      @relation("SentBy")
+  notes                 Note[]
 
   @@map("users")
 }
@@ -147,6 +151,7 @@ model Channel {
   contacts      Contact[]
   conversations Conversation[]
   webhookEvents WebhookEvent[]
+  automations   Automation[]
 
   @@index([organizationId])
   @@map("channels")
@@ -215,8 +220,10 @@ model Conversation {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   channel      Channel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
   contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  assignedUser User?        @relation("AssignedAgent", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  assignedUser User?             @relation("AssignedAgent", fields: [assignedUserId], references: [id], onDelete: SetNull)
   messages     Message[]
+  tags         ConversationTag[]
+  notes        Note[]
 
   @@unique([channelId, contactId])
   @@index([organizationId, channelId, status, lastMessageAt(sort: Desc)])
@@ -246,4 +253,72 @@ model Message {
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@map("messages")
+}
+
+// ---------------------------------------------------------------------------
+// F2 - Etiquetas, notas y automatizaciones
+// ---------------------------------------------------------------------------
+
+model Tag {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  color          String   @default("#6366f1")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization  Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversations ConversationTag[]
+
+  @@unique([organizationId, name])
+  @@map("tags")
+}
+
+model ConversationTag {
+  conversationId String @map("conversation_id") @db.Uuid
+  tagId          String @map("tag_id") @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  tag          Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, tagId])
+  @@map("conversation_tags")
+}
+
+model Note {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  body           String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("notes")
+}
+
+model Automation {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  channelId       String?   @map("channel_id") @db.Uuid
+  name            String
+  enabled         Boolean   @default(true)
+  trigger         Json
+  conditions      Json      @default("[]")
+  actions         Json
+  priority        Int       @default(100)
+  cooldownSeconds Int       @default(60) @map("cooldown_seconds")
+  fireCount       BigInt    @default(0) @map("fire_count")
+  lastFiredAt     DateTime? @map("last_fired_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channel      Channel?     @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, enabled, priority])
+  @@map("automations")
 }
