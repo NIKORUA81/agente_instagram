@@ -387,3 +387,81 @@ export interface ImpersonateResponseDto {
   access_token: string;
   organization: OrganizationDto;
 }
+
+// ---------------------------------------------------------------------------
+// F3 - IA y base de conocimiento
+// ---------------------------------------------------------------------------
+
+export const KNOWLEDGE_SOURCE_TYPES = [
+  'text',
+  'faq',
+  'policy',
+  'url',
+  'pdf',
+  'docx',
+  'xlsx',
+] as const;
+export type KnowledgeSourceType = (typeof KNOWLEDGE_SOURCE_TYPES)[number];
+
+export const KNOWLEDGE_STATUSES = ['pending', 'processing', 'ready', 'failed'] as const;
+export type KnowledgeStatus = (typeof KNOWLEDGE_STATUSES)[number];
+
+export interface KnowledgeSourceDto {
+  id: string;
+  type: KnowledgeSourceType;
+  name: string;
+  url: string | null;
+  status: KnowledgeStatus;
+  error: string | null;
+  chunk_count: number;
+  refreshed_at: string | null;
+  created_at: string;
+}
+
+export interface CatalogItemDto {
+  id: string;
+  sku: string | null;
+  name: string;
+  description: string | null;
+  price: number | null;
+  currency: string;
+  stock: number | null;
+  active: boolean;
+  created_at: string;
+}
+
+export const AI_TONES = ['professional', 'friendly', 'casual'] as const;
+export type AiTone = (typeof AI_TONES)[number];
+
+export interface AiProfileDto {
+  id: string;
+  channel_id: string;
+  enabled: boolean;
+  system_prompt: string;
+  tone: AiTone;
+  language_policy: string;
+  disclosure_message: string;
+  handover_keywords: string[];
+  guardrails: Record<string, unknown>;
+  business_hours: Record<string, unknown> | null;
+  monthly_token_budget: number | null;
+  tokens_used_month: number;
+  confidence_threshold: number;
+  updated_at: string;
+}
+
+export interface TestReplyRequest {
+  channel_id: string;
+  message: string;
+}
+
+export interface TestReplyResult {
+  reply: string | null;
+  handover: boolean;
+  intent: string | null;
+  language: string | null;
+  sentiment: string | null;
+  confidence: number;
+  used_sources: string[];
+  reason: string | null;
+}

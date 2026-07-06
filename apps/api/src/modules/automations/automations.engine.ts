@@ -33,7 +33,8 @@ export class AutomationsEngine {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
-  async evaluate(input: EngineInput): Promise<void> {
+  /** Devuelve true si alguna automatización manejó el mensaje (para que la IA no responda encima). */
+  async evaluate(input: EngineInput): Promise<boolean> {
     const { channel, conversation, message } = input;
     const ctx: TriggerContext = {
       kind:
@@ -63,15 +64,16 @@ export class AutomationsEngine {
         if (!(await this.passesCooldown(automation, conversation.contactId))) continue;
 
         await this.execute(automation, input);
-        return; // primera coincidencia gana
+        return true; // primera coincidencia gana
       } catch (err) {
         // Una automatización rota jamás debe tumbar el procesamiento del mensaje
         this.logger.error(
           `Automatización ${automation.id} (${automation.name}) falló: ${(err as Error).message}`,
         );
-        return;
+        return true; // se considera "manejado" para no responder con IA sobre un fallo
       }
     }
+    return false;
   }
 
   // ---------------------------------------------------------------------------

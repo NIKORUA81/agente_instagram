@@ -213,6 +213,37 @@ networks:
 | `REDIS_URL` | `redis://:REDIS_PASSWORD@redis:6379` (§3) |
 | `JWT_PRIVATE/PUBLIC_KEY_BASE64`, `TOKEN_ENC_KEY_BASE64`, `META_WEBHOOK_VERIFY_TOKEN` | En tu PC: `node infra/scripts/generate-jwt-keys.mjs` → **claves DISTINTAS a las de desarrollo** |
 | `META_*` | Panel de developers.facebook.com (§8) |
+| `AI_SERVICE_URL` | `http://wolfiax-ai-service:5000` (nombre del contenedor del ai-service en la red `wolfiax`) |
+| `AI_SERVICE_TOKEN` | Un valor aleatorio; el MISMO en `INTERNAL_API_TOKEN` del stack del ai-service (§6b) |
+
+### 6b. Stack del ai-service (F3 — motor de IA)
+
+Otro servicio en el stack (o un stack aparte) en la red `wolfiax`. Imagen
+`ghcr.io/TU_USUARIO/wolfiax-ai-service:latest` (la construye tu workflow de GHCR).
+
+```yaml
+  ai-service:
+    image: ghcr.io/nikorua81/wolfiax-ai-service:latest
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      PORT: "5000"
+      DATABASE_URL: ${DATABASE_URL}          # la MISMA que el api (wolfiax_db)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY} # clave secreta sk-ant-api03-...
+      INTERNAL_API_TOKEN: ${AI_SERVICE_TOKEN} # igual que AI_SERVICE_TOKEN del api
+      LLM_MODEL: claude-opus-4-8
+    networks: [wolfiax]
+    # No se expone al exterior: solo lo llama el api por la red interna.
+```
+
+Notas:
+- **`ANTHROPIC_API_KEY`** es la clave secreta (`sk-ant-api03-…`) que se muestra
+  UNA vez al crearla en console.anthropic.com, **no** el JSON de metadata.
+- En el **primer arranque** descarga el modelo de embeddings (~1 GB, ONNX);
+  puede tardar 1-2 min hasta que `/healthz` responda `ok`. Dale RAM (≥1.5 GB).
+- No publica puertos: el api lo alcanza en `http://wolfiax-ai-service:5000`.
+- Verificación: `docker exec wolfiax-ai-service curl -fsS http://localhost:5000/healthz`
+  debe dar `{"status":"ok","db":"ok","llm_configured":true}`.
 
 ## 7. Migraciones de base de datos
 

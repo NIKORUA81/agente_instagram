@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CONVERSATION_STATUSES,
   ERROR_CODES,
+  WS_EVENTS,
   type ConversationDto,
   type ConversationStatus,
   type MessageDto,
@@ -30,6 +31,7 @@ import { AppError } from '../../common/errors/app-error';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../iam/audit.service';
 import { MessagingService } from '../messaging/messaging.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import {
   decodeCursor,
   encodeCursor,
@@ -112,7 +114,48 @@ export class ConversationsController {
     private readonly prisma: PrismaService,
     private readonly messaging: MessagingService,
     private readonly audit: AuditService,
+    private readonly gateway: RealtimeGateway,
   ) {}
+
+  @Post(':id/handover')
+  @Roles('owner', 'admin', 'agent')
+  @ApiOperation({ summary: 'Transfiere la conversación a un humano (silencia la IA)' })
+  async handover(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ConversationDto> {
+    await this.findOrFail(user, id);
+    const updated = await this.prisma.withTenant(user.organizationId, (tx) =>
+      tx.conversation.update({
+        where: { id },
+        data: { mode: 'human', status: 'pending' },
+        include: CONVERSATION_INCLUDE,
+      }),
+    );
+    const dto = toConversationDto(updated);
+    this.gateway.emitToOrg(user.organizationId, WS_EVENTS.CONVERSATION_UPDATED, dto);
+    return dto;
+  }
+
+  @Post(':id/return-to-ai')
+  @Roles('owner', 'admin', 'agent')
+  @ApiOperation({ summary: 'Devuelve la conversación al modo IA' })
+  async returnToAi(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ConversationDto> {
+    await this.findOrFail(user, id);
+    const updated = await this.prisma.withTenant(user.organizationId, (tx) =>
+      tx.conversation.update({
+        where: { id },
+        data: { mode: 'ai', status: 'open' },
+        include: CONVERSATION_INCLUDE,
+      }),
+    );
+    const dto = toConversationDto(updated);
+    this.gateway.emitToOrg(user.organizationId, WS_EVENTS.CONVERSATION_UPDATED, dto);
+    return dto;
+  }
 
   @Get()
   @ApiOperation({ summary: 'Bandeja: filtros por estado/etiqueta + búsqueda' })

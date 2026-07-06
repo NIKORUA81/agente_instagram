@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AiModule } from '../ai/ai.module';
 import { AutomationsModule } from '../automations/automations.module';
 import { ChannelsModule } from '../channels/channels.module';
 import { IamModule } from '../iam/iam.module';
@@ -11,7 +12,14 @@ import { InboundProcessor } from './inbound.processor';
 import { TagsController } from './tags.controller';
 
 @Module({
-  imports: [IamModule, ChannelsModule, RealtimeModule, MessagingModule, AutomationsModule],
+  imports: [
+    IamModule,
+    ChannelsModule,
+    RealtimeModule,
+    MessagingModule,
+    AutomationsModule,
+    AiModule,
+  ],
   controllers: [ConversationsController, TagsController, ContactsController],
   providers: [InboundProcessor, AuditService],
 })

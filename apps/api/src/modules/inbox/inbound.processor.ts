@@ -14,6 +14,7 @@ import { TokenCipherService } from '../../common/crypto/token-cipher.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { QUEUE_NAMES, REDIS_OPTIONS } from '../../common/queue/queue.module';
 import type { Env } from '../../config/configuration';
+import { AiReplyService } from '../ai/ai-reply.service';
 import { AutomationsEngine } from '../automations/automations.engine';
 import { MetaGraphService } from '../channels/meta-graph.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -44,6 +45,7 @@ export class InboundProcessor implements OnModuleInit, OnApplicationShutdown {
     private readonly cipher: TokenCipherService,
     private readonly gateway: RealtimeGateway,
     private readonly automations: AutomationsEngine,
+    private readonly aiReply: AiReplyService,
     private readonly config: ConfigService<Env, true>,
     @Inject(REDIS_OPTIONS) private readonly redisOptions: RedisOptions,
   ) {}
@@ -129,6 +131,16 @@ export class InboundProcessor implements OnModuleInit, OnApplicationShutdown {
       );
     }
 
+    // ¿La IA está habilitada en este canal? Determina el modo por defecto de las
+    // conversaciones nuevas (ai) vs. atención humana.
+    const aiEnabled = await this.prisma.withTenant(channel.organizationId, async (tx) => {
+      const p = await tx.aiProfile.findUnique({
+        where: { channelId: channel.id },
+        select: { enabled: true },
+      });
+      return p?.enabled === true;
+    });
+
     const result = await this.prisma.withTenant(channel.organizationId, async (tx) => {
       const contact = await tx.contact.upsert({
         where: { channelId_igScopedId: { channelId: channel.id, igScopedId: contactIgsid } },
@@ -158,6 +170,7 @@ export class InboundProcessor implements OnModuleInit, OnApplicationShutdown {
           channelId: channel.id,
           contactId: contact.id,
           status: 'open',
+          mode: aiEnabled ? 'ai' : 'human',
           lastMessageAt: eventDate,
           ...windowUpdate,
         },
@@ -192,15 +205,28 @@ export class InboundProcessor implements OnModuleInit, OnApplicationShutdown {
         toConversationDto({ ...result.conversation, messages: [result.message] }),
       );
 
-      // Motor de automatizaciones: solo sobre mensajes ENTRANTES del usuario
-      // (nunca sobre echoes del propio negocio, para no auto-dispararse).
+      // Enrutamiento (doc 04 §2): automatizaciones primero; si ninguna maneja
+      // el mensaje y la IA está habilitada + la conversación en modo 'ai', la IA
+      // responde. Solo sobre mensajes ENTRANTES del usuario (nunca echoes).
       if (!isEcho) {
-        await this.automations.evaluate({
+        const handled = await this.automations.evaluate({
           channel,
           conversation: result.conversation,
           message: result.message,
           isNewContact: !existingContact,
         });
+        if (!handled) {
+          try {
+            await this.aiReply.maybeReply({
+              channel,
+              conversation: result.conversation,
+              messageId: result.message.id,
+              text: result.message.text ?? '',
+            });
+          } catch (err) {
+            this.logger.error(`Fallo en respuesta IA: ${(err as Error).message}`);
+          }
+        }
       }
     }
   }

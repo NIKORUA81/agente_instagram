@@ -12,11 +12,13 @@ import { GlobalExceptionFilter } from './common/errors/http-exception.filter';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { QueueModule } from './common/queue/queue.module';
 import { validateEnv } from './config/configuration';
+import { AiModule } from './modules/ai/ai.module';
 import { AutomationsModule } from './modules/automations/automations.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { HealthModule } from './modules/health/health.module';
 import { IamModule } from './modules/iam/iam.module';
 import { InboxModule } from './modules/inbox/inbox.module';
+import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { MessagingModule } from './modules/messaging/messaging.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
@@ -49,6 +51,8 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     WebhooksModule,
     MessagingModule,
     AutomationsModule,
+    AiModule,
+    KnowledgeModule,
     InboxModule,
     PlatformModule,
     HealthModule,

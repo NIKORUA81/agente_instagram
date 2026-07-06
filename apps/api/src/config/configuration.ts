@@ -43,6 +43,11 @@ const envSchema = z.object({
   SUPERADMIN_EMAIL: z.string().email().optional(),
   SUPERADMIN_PASSWORD: z.string().min(10).optional(),
   SUPERADMIN_NAME: z.string().optional(),
+
+  // --- F3: servicio de IA (FastAPI) ---
+  AI_SERVICE_URL: z.string().url().default('http://localhost:5000'),
+  /** Token compartido (X-Internal-Token) para llamar al ai-service. */
+  AI_SERVICE_TOKEN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

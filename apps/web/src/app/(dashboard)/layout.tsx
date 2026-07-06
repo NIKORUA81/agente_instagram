@@ -3,6 +3,7 @@
 import {
   BarChart3,
   BookOpen,
+  Bot,
   Inbox,
   Instagram,
   LogOut,
@@ -24,7 +25,8 @@ const NAV = [
   { href: '/inbox', label: 'Inbox', icon: Inbox, enabled: true },
   { href: '/contacts', label: 'Contactos', icon: Users, enabled: true },
   { href: '/automations', label: 'Automatizaciones', icon: Zap, enabled: true },
-  { href: '/knowledge', label: 'Conocimiento', icon: BookOpen, enabled: false, phase: 'F3' },
+  { href: '/knowledge', label: 'Conocimiento', icon: BookOpen, enabled: true },
+  { href: '/settings/ai', label: 'IA', icon: Bot, enabled: true },
   { href: '/flows', label: 'Flujos', icon: Workflow, enabled: false, phase: 'F4' },
   { href: '/settings/channels', label: 'Canales', icon: Instagram, enabled: true },
   { href: '/settings/team', label: 'Equipo', icon: Settings, enabled: true },

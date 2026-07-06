@@ -14,6 +14,7 @@ import {
 } from '@wolfiax/shared';
 import {
   Archive,
+  Bot,
   CheckCircle2,
   Clock,
   Inbox as InboxIcon,
@@ -22,6 +23,7 @@ import {
   Send,
   StickyNote,
   Tag as TagIcon,
+  UserRound,
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -225,6 +227,11 @@ function ConversationThread({ conversation }: { conversation: ConversationDto })
     void qc.invalidateQueries({ queryKey: ['conversations'] });
   }
 
+  async function setMode(action: 'handover' | 'return-to-ai') {
+    await api.post(`/conversations/${conversation.id}/${action}`);
+    void qc.invalidateQueries({ queryKey: ['conversations'] });
+  }
+
   const windowOpen =
     conversation.window_expires_at != null &&
     new Date(conversation.window_expires_at).getTime() > Date.now();
@@ -247,6 +254,25 @@ function ConversationThread({ conversation }: { conversation: ConversationDto })
           <p className="truncate text-sm font-semibold">{contactName(conversation)}</p>
           <WindowChip windowExpiresAt={conversation.window_expires_at} />
         </div>
+        {conversation.mode === 'ai' ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void setMode('handover')}
+            title="Pausar la IA y atender tú"
+          >
+            <Bot className="size-3.5 text-brand-600" /> IA activa
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void setMode('return-to-ai')}
+            title="Devolver a la IA"
+          >
+            <UserRound className="size-3.5" /> Humano
+          </Button>
+        )}
         <Button
           variant={showNotes ? 'primary' : 'ghost'}
           size="sm"
