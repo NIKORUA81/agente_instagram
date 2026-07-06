@@ -235,7 +235,29 @@ Verificación en PgAdmin de que el RLS está activo (deben devolver ambas `t`):
 SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = 'conversations';
 ```
 
-### Alternativa manual (sin redesplegar)
+### Super Admin de plataforma (staff Wolfiax)
+
+Para crear el primer Super Admin, añade estas variables al stack `wolfiax-app`
+(servicio `api`) y redespliega — el API lo crea/promueve al arrancar:
+
+```
+SUPERADMIN_EMAIL=admin@wolfiax.com
+SUPERADMIN_PASSWORD=<contraseña fuerte, mínimo 10 caracteres>
+SUPERADMIN_NAME=Wolfiax Super Admin
+```
+
+- Si el email no existe → crea el usuario + una organización personal
+  «Wolfiax Platform» (para poder iniciar sesión con el flujo normal).
+- Si ya existe → lo promueve a Super Admin y actualiza su contraseña con la
+  del entorno (cuenta de emergencia gobernada por las env del stack).
+
+Es idempotente: seguro en cada reinicio. Tras el primer arranque puedes
+**quitar `SUPERADMIN_PASSWORD`** del stack (el usuario ya existe) y gestionar el
+resto de Super Admins desde el panel **Plataforma** de la app. El Super Admin
+puede entrar a cualquier organización (impersonación) y suspender tenants; todo
+queda en la tabla `audit_logs`.
+
+### Alternativa manual de migraciones (sin redesplegar)
 
 Si necesitas correr migraciones sin reconstruir la imagen, desde la consola del
 contenedor `api` (`/bin/sh`, en `/app`):
