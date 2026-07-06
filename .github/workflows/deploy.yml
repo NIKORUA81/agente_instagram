@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       next_public_api_url:
-        description: 'NEXT_PUBLIC_API_URL for the web client (e.g. https://api.tudominio.com)'
+        description: 'NEXT_PUBLIC_API_URL for the web client'
         required: true
-        default: 'https://api.tudominio.com'
+        default: 'https://api.wolfiax.com'
 
 env:
   REGISTRY: ghcr.io
@@ -88,9 +88,8 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "api_url=${{ github.event.inputs.next_public_api_url }}" >> "$GITHUB_OUTPUT"
           else
-            # Default fallback or dynamic extraction.
-            # Puedes cambiar esto por tu dominio real si compilas por tag
-            echo "api_url=https://api.tudominio.com" >> "$GITHUB_OUTPUT"
+            # Fallback para builds por tag (v*): dominio de producción de Wolfiax
+            echo "api_url=https://api.wolfiax.com" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push Web image
