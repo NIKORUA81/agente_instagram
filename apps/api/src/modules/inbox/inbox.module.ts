@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AiModule } from '../ai/ai.module';
 import { AutomationsModule } from '../automations/automations.module';
 import { ChannelsModule } from '../channels/channels.module';
+import { FlowsModule } from '../flows/flows.module';
 import { IamModule } from '../iam/iam.module';
 import { AuditService } from '../iam/audit.service';
 import { MessagingModule } from '../messaging/messaging.module';
@@ -19,6 +20,7 @@ import { TagsController } from './tags.controller';
     MessagingModule,
     AutomationsModule,
     AiModule,
+    FlowsModule,
   ],
   controllers: [ConversationsController, TagsController, ContactsController],
   providers: [InboundProcessor, AuditService],

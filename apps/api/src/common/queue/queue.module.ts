@@ -10,11 +10,13 @@ export const REDIS_OPTIONS = 'REDIS_OPTIONS';
 export const QUEUE_INBOUND = 'QUEUE_INBOUND';
 export const QUEUE_OUTBOUND = 'QUEUE_OUTBOUND';
 export const QUEUE_INGEST = 'QUEUE_INGEST';
+export const QUEUE_FLOW = 'QUEUE_FLOW';
 
 export const QUEUE_NAMES = {
   inbound: 'inbound',
   outbound: 'outbound',
   ingest: 'ingest',
+  flow: 'flow',
 } as const;
 
 /** redis://[:pass@]host:port[/db] → opciones ioredis (BullMQ exige maxRetriesPerRequest null). */
@@ -87,7 +89,21 @@ export function parseRedisUrl(url: string): RedisOptions {
           },
         }),
     },
+    {
+      provide: QUEUE_FLOW,
+      inject: [REDIS_OPTIONS],
+      useFactory: (options: RedisOptions) =>
+        new Queue(QUEUE_NAMES.flow, {
+          connection: options,
+          defaultJobOptions: {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 3000 },
+            removeOnComplete: { age: 24 * 3600, count: 5000 },
+            removeOnFail: false,
+          },
+        }),
+    },
   ],
-  exports: [REDIS_CLIENT, REDIS_OPTIONS, QUEUE_INBOUND, QUEUE_OUTBOUND, QUEUE_INGEST],
+  exports: [REDIS_CLIENT, REDIS_OPTIONS, QUEUE_INBOUND, QUEUE_OUTBOUND, QUEUE_INGEST, QUEUE_FLOW],
 })
 export class QueueModule {}

@@ -85,12 +85,23 @@ export class MessagingService {
     });
   }
 
+  /** Usado por el motor de flujos (F4). */
+  async sendAsFlow(conversation: Conversation, text: string): Promise<Message | null> {
+    if (!isWindowOpen(conversation)) return null;
+    return this.enqueue(conversation, {
+      source: 'flow',
+      sentByUserId: null,
+      text,
+      attachment: null,
+    });
+  }
+
   // ---------------------------------------------------------------------------
 
   private async enqueue(
     conversation: Conversation,
     input: {
-      source: 'agent' | 'automation' | 'ai';
+      source: 'agent' | 'automation' | 'ai' | 'flow';
       sentByUserId: string | null;
       text: string | null;
       attachment: { type: string; url: string } | null;

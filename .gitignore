@@ -26,6 +26,9 @@ coverage/
 .DS_Store
 Thumbs.db
 
+# Sidecars AppleDouble (macOS en volúmenes exFAT/NTFS externos)
+._*
+
 # Prisma
 apps/api/prisma/*.db
 

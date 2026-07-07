@@ -249,6 +249,7 @@ export const WS_EVENTS = {
   MESSAGE_STATUS: 'message.status',
   CONVERSATION_UPDATED: 'conversation.updated',
   CHANNEL_STATUS: 'channel.status',
+  FLOW_EXECUTION: 'flow.execution',
 } as const;
 
 export interface WsMessageNewPayload {
@@ -464,4 +465,203 @@ export interface TestReplyResult {
   confidence: number;
   used_sources: string[];
   reason: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// F4 - Flow Builder (constructor de flujos)
+// ---------------------------------------------------------------------------
+
+/**
+ * Tipos de nodo del editor (React Flow). Cada nodo lleva `data` con su
+ * configuración; el grafo se interpreta como máquina de estados persistida
+ * (ver docs/04-FLUJOS.md §3). El backend valida estructura con zod.
+ */
+export const FLOW_NODE_TYPES = [
+  'start', // punto de entrada (uno por flujo)
+  'message', // envía un mensaje y continúa (nodo "respuesta")
+  'question', // pregunta y espera respuesta del contacto
+  'condition', // ramifica según una variable
+  'variable', // asigna una variable
+  'tag', // etiqueta la conversación
+  'ai', // delega la respuesta a la IA; puede rutear por intención
+  'wait', // pausa (timer); re-verifica la ventana de 24h al despertar
+  'webhook', // POST saliente (fire-and-forget)
+  'api', // llamada HTTP con respuesta mapeada a variables
+  'transfer', // transfiere a un agente humano y termina
+  'end', // finaliza el flujo
+] as const;
+export type FlowNodeType = (typeof FLOW_NODE_TYPES)[number];
+
+export const FLOW_ANSWER_TYPES = ['text', 'number', 'email', 'phone', 'option'] as const;
+export type FlowAnswerType = (typeof FLOW_ANSWER_TYPES)[number];
+
+export const FLOW_CONDITION_OPS = [
+  'equals',
+  'not_equals',
+  'contains',
+  'gt',
+  'lt',
+  'is_set',
+  'is_empty',
+] as const;
+export type FlowConditionOp = (typeof FLOW_CONDITION_OPS)[number];
+
+/** Configuración específica de cada tipo de nodo (en `node.data`). */
+export interface FlowNodeData {
+  label?: string;
+  // message / question
+  text?: string;
+  // question
+  answer_type?: FlowAnswerType;
+  save_as?: string; // variable donde guardar la respuesta
+  options?: string[]; // para answer_type 'option'; cada opción crea un handle de salida
+  retry_text?: string; // mensaje ante respuesta inválida
+  // condition
+  variable?: string;
+  op?: FlowConditionOp;
+  value?: string;
+  // variable
+  set_name?: string;
+  set_value?: string;
+  // tag
+  tag_id?: string;
+  // ai
+  prompt?: string; // instrucción adicional para el nodo IA
+  route_by_intent?: boolean; // si true, cada handle nombrado = una intención
+  intents?: string[];
+  // wait
+  seconds?: number;
+  // webhook / api
+  url?: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  headers?: Record<string, string>;
+  body?: string;
+  response_map?: Record<string, string>; // variable -> JSONPath simple (a.b.c)
+  // transfer
+  note?: string;
+}
+
+export interface FlowNode {
+  id: string;
+  type: FlowNodeType;
+  position: { x: number; y: number };
+  data: FlowNodeData;
+}
+
+export interface FlowEdge {
+  id: string;
+  source: string;
+  target: string;
+  /** handle de salida (rama): 'true'/'false', 'invalid', 'closed', opción, intención… */
+  sourceHandle?: string | null;
+  label?: string;
+}
+
+export interface FlowGraph {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+}
+
+export const FLOW_TRIGGER_TYPES = ['manual', 'keyword', 'new_contact', 'any_message'] as const;
+export type FlowTriggerType = (typeof FLOW_TRIGGER_TYPES)[number];
+
+export type FlowTrigger =
+  | { type: 'manual' }
+  | { type: 'keyword'; keywords: string[]; match?: 'contains' | 'exact' }
+  | { type: 'new_contact' }
+  | { type: 'any_message' };
+
+export const FLOW_STATUSES = ['draft', 'published'] as const;
+export type FlowStatus = (typeof FLOW_STATUSES)[number];
+
+export interface FlowDto {
+  id: string;
+  name: string;
+  description: string | null;
+  channel_id: string | null;
+  enabled: boolean;
+  status: FlowStatus;
+  trigger: FlowTrigger;
+  graph: FlowGraph; // borrador editable
+  published_version: number | null;
+  version_count: number;
+  execution_count: number;
+  updated_at: string;
+  created_at: string;
+}
+
+export interface FlowVersionDto {
+  id: string;
+  version: number;
+  graph: FlowGraph;
+  trigger: FlowTrigger;
+  created_at: string;
+}
+
+export interface FlowValidationIssue {
+  node_id: string | null;
+  code: string;
+  message: string;
+}
+
+export interface FlowValidationResult {
+  valid: boolean;
+  issues: FlowValidationIssue[];
+}
+
+export const FLOW_EXECUTION_STATUSES = [
+  'running',
+  'waiting_input',
+  'waiting_timer',
+  'completed',
+  'failed',
+  'aborted',
+] as const;
+export type FlowExecutionStatus = (typeof FLOW_EXECUTION_STATUSES)[number];
+
+export interface FlowTraceEntry {
+  node_id: string;
+  node_type: FlowNodeType;
+  at: string;
+  detail?: string;
+  branch?: string;
+}
+
+export interface FlowExecutionDto {
+  id: string;
+  flow_id: string;
+  flow_name: string;
+  conversation_id: string;
+  contact_name: string | null;
+  status: FlowExecutionStatus;
+  current_node_id: string | null;
+  variables: Record<string, unknown>;
+  steps: number;
+  trace: FlowTraceEntry[];
+  error: string | null;
+  wake_at: string | null;
+  started_at: string;
+  ended_at: string | null;
+}
+
+/** Resultado de simular un flujo en el sandbox (sin enviar nada real). */
+export interface FlowSimulationStep {
+  node_id: string;
+  node_type: FlowNodeType;
+  kind: 'send' | 'wait_input' | 'wait_timer' | 'ai' | 'transfer' | 'end' | 'action' | 'error';
+  output?: string;
+  branch?: string;
+  variables: Record<string, unknown>;
+}
+
+export interface FlowSimulationResult {
+  steps: FlowSimulationStep[];
+  status: FlowExecutionStatus;
+  /** true si el flujo quedó esperando input del usuario (para el próximo turno). */
+  awaiting_input: boolean;
+}
+
+export interface WsFlowExecutionPayload {
+  conversation_id: string;
+  execution: FlowExecutionDto;
 }

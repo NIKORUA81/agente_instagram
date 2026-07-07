@@ -38,6 +38,9 @@ model Organization {
   knowledgeSources KnowledgeSource[]
   chunks           Chunk[]
   catalogItems     CatalogItem[]
+  flows            Flow[]
+  flowVersions     FlowVersion[]
+  flowExecutions   FlowExecution[]
 
   @@map("organizations")
 }
@@ -158,6 +161,7 @@ model Channel {
   webhookEvents WebhookEvent[]
   automations   Automation[]
   aiProfile     AiProfile?
+  flows         Flow[]
 
   @@index([organizationId])
   @@map("channels")
@@ -197,6 +201,7 @@ model Contact {
   organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   channel       Channel        @relation(fields: [channelId], references: [id], onDelete: Cascade)
   conversations Conversation[]
+  flowExecutions FlowExecution[]
 
   @@unique([channelId, igScopedId])
   @@index([organizationId])
@@ -230,6 +235,7 @@ model Conversation {
   messages     Message[]
   tags         ConversationTag[]
   notes        Note[]
+  flowExecutions FlowExecution[]
 
   @@unique([channelId, contactId])
   @@index([organizationId, channelId, status, lastMessageAt(sort: Desc)])
@@ -411,4 +417,78 @@ model CatalogItem {
 
   @@index([organizationId])
   @@map("catalog_items")
+}
+
+// ---------------------------------------------------------------------------
+// F4 - Flow Builder
+// ---------------------------------------------------------------------------
+
+model Flow {
+  id                 String    @id @default(uuid()) @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
+  channelId          String?   @map("channel_id") @db.Uuid
+  name               String
+  description        String?
+  enabled            Boolean   @default(false)
+  status             String    @default("draft")
+  trigger            Json      @default("{\"type\":\"manual\"}")
+  graph              Json      @default("{\"nodes\":[],\"edges\":[]}")
+  publishedVersionId String?   @map("published_version_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channel      Channel?        @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  versions     FlowVersion[]   @relation("FlowVersions")
+  executions   FlowExecution[]
+
+  @@index([organizationId, enabled])
+  @@map("flows")
+}
+
+model FlowVersion {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  flowId         String   @map("flow_id") @db.Uuid
+  version        Int
+  graph          Json
+  trigger        Json
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  flow         Flow            @relation("FlowVersions", fields: [flowId], references: [id], onDelete: Cascade)
+  executions   FlowExecution[]
+
+  @@unique([flowId, version])
+  @@index([organizationId])
+  @@map("flow_versions")
+}
+
+model FlowExecution {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  flowId         String    @map("flow_id") @db.Uuid
+  flowVersionId  String    @map("flow_version_id") @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  contactId      String    @map("contact_id") @db.Uuid
+  status         String    @default("running")
+  currentNodeId  String?   @map("current_node_id")
+  variables      Json      @default("{}")
+  trace          Json      @default("[]")
+  steps          Int       @default(0)
+  wakeAt         DateTime? @map("wake_at") @db.Timestamptz(6)
+  error          String?
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  endedAt        DateTime? @map("ended_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  flow         Flow         @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  flowVersion  FlowVersion  @relation(fields: [flowVersionId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  contact      Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, status])
+  @@index([organizationId, status])
+  @@map("flow_executions")
 }

@@ -58,6 +58,8 @@
     "moduleFileExtensions": ["js", "json", "ts"],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
+    "testPathIgnorePatterns": ["/node_modules/", "/\\._"],
+    "modulePathIgnorePatterns": ["/\\._"],
     "transform": {
       "^.+\\.ts$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
     },

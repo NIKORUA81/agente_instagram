@@ -6,7 +6,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Channel, Prisma } from '@prisma/client';
+import type { Channel, Contact, Conversation, Message, Prisma } from '@prisma/client';
 import { WS_EVENTS } from '@wolfiax/shared';
 import { Worker, type Job } from 'bullmq';
 import type { RedisOptions } from 'ioredis';
@@ -17,6 +17,8 @@ import type { Env } from '../../config/configuration';
 import { AiReplyService } from '../ai/ai-reply.service';
 import { AutomationsEngine } from '../automations/automations.engine';
 import { MetaGraphService } from '../channels/meta-graph.service';
+import { FlowEngineService } from '../flows/flow-engine.service';
+import { FlowTriggerService } from '../flows/flow-trigger.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import type { MetaMessagingEvent } from '../webhooks/meta-webhook.types';
 import { toConversationDto, toMessageDto } from './inbox.mappers';
@@ -46,6 +48,8 @@ export class InboundProcessor implements OnModuleInit, OnApplicationShutdown {
     private readonly gateway: RealtimeGateway,
     private readonly automations: AutomationsEngine,
     private readonly aiReply: AiReplyService,
+    private readonly flowEngine: FlowEngineService,
+    private readonly flowTrigger: FlowTriggerService,
     private readonly config: ConfigService<Env, true>,
     @Inject(REDIS_OPTIONS) private readonly redisOptions: RedisOptions,
   ) {}
@@ -205,29 +209,76 @@ export class InboundProcessor implements OnModuleInit, OnApplicationShutdown {
         toConversationDto({ ...result.conversation, messages: [result.message] }),
       );
 
-      // Enrutamiento (doc 04 §2): automatizaciones primero; si ninguna maneja
-      // el mensaje y la IA está habilitada + la conversación en modo 'ai', la IA
-      // responde. Solo sobre mensajes ENTRANTES del usuario (nunca echoes).
+      // Enrutamiento (doc 04 §2, paso 10). Solo sobre mensajes ENTRANTES (nunca echoes).
+      // Orden: (a) conversación en modo humano → nada; (b) ejecución de flujo en
+      // espera de input → reanudar; (c) automatizaciones; (d) disparar flujo;
+      // (e) IA.
       if (!isEcho) {
-        const handled = await this.automations.evaluate({
-          channel,
-          conversation: result.conversation,
-          message: result.message,
-          isNewContact: !existingContact,
-        });
-        if (!handled) {
-          try {
-            await this.aiReply.maybeReply({
-              channel,
-              conversation: result.conversation,
-              messageId: result.message.id,
-              text: result.message.text ?? '',
-            });
-          } catch (err) {
-            this.logger.error(`Fallo en respuesta IA: ${(err as Error).message}`);
-          }
-        }
+        await this.route(channel, result.conversation, result.message, !existingContact);
       }
+    }
+  }
+
+  /**
+   * Decide qué maneja un mensaje entrante (doc 04 §2, paso 10). Una excepción en
+   * cualquier etapa jamás debe tumbar el procesamiento del webhook.
+   */
+  private async route(
+    channel: Channel,
+    conversation: Conversation & { contact: Contact },
+    message: Message,
+    isNewContact: boolean,
+  ): Promise<void> {
+    const text = message.text ?? '';
+
+    // (a) atención humana: los agentes responden desde el inbox
+    if (conversation.mode === 'human') return;
+
+    // (b) ¿hay un flujo suspendido esperando la respuesta del contacto?
+    try {
+      const waiting = await this.flowEngine.findWaitingInput(channel.organizationId, conversation.id);
+      if (waiting) {
+        await this.flowEngine.resumeWithMessage(waiting, conversation, channel, text);
+        return;
+      }
+    } catch (err) {
+      this.logger.error(`Fallo al reanudar flujo: ${(err as Error).message}`);
+      return;
+    }
+
+    // (c) automatizaciones
+    const handled = await this.automations.evaluate({
+      channel,
+      conversation,
+      message,
+      isNewContact,
+    });
+    if (handled) return;
+
+    // (d) disparar un flujo publicado
+    try {
+      const started = await this.flowTrigger.maybeStart({
+        channel,
+        conversation,
+        text,
+        isNewContact,
+      });
+      if (started) return;
+    } catch (err) {
+      this.logger.error(`Fallo al disparar flujo: ${(err as Error).message}`);
+      return;
+    }
+
+    // (e) IA
+    try {
+      await this.aiReply.maybeReply({
+        channel,
+        conversation,
+        messageId: message.id,
+        text,
+      });
+    } catch (err) {
+      this.logger.error(`Fallo en respuesta IA: ${(err as Error).message}`);
     }
   }
 

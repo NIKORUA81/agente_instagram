@@ -11,6 +11,8 @@ export default tseslint.config(
       "**/coverage/**",
       "**/next-env.d.ts",
       "apps/ai-service/**",
+      // Sidecar AppleDouble creados por macOS en volúmenes externos (exFAT/NTFS)
+      "**/._*",
     ],
   },
   js.configs.recommended,

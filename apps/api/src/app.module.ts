@@ -15,6 +15,7 @@ import { validateEnv } from './config/configuration';
 import { AiModule } from './modules/ai/ai.module';
 import { AutomationsModule } from './modules/automations/automations.module';
 import { ChannelsModule } from './modules/channels/channels.module';
+import { FlowsModule } from './modules/flows/flows.module';
 import { HealthModule } from './modules/health/health.module';
 import { IamModule } from './modules/iam/iam.module';
 import { InboxModule } from './modules/inbox/inbox.module';
@@ -53,6 +54,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     AutomationsModule,
     AiModule,
     KnowledgeModule,
+    FlowsModule,
     InboxModule,
     PlatformModule,
     HealthModule,

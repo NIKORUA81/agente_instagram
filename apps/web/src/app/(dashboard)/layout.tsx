@@ -20,14 +20,20 @@ import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/lib/auth-context';
 import { cn, ROLE_LABELS } from '@/lib/utils';
 
-const NAV = [
+const NAV: {
+  href: string;
+  label: string;
+  icon: typeof BarChart3;
+  enabled: boolean;
+  phase?: string;
+}[] = [
   { href: '/dashboard', label: 'Inicio', icon: BarChart3, enabled: true },
   { href: '/inbox', label: 'Inbox', icon: Inbox, enabled: true },
   { href: '/contacts', label: 'Contactos', icon: Users, enabled: true },
   { href: '/automations', label: 'Automatizaciones', icon: Zap, enabled: true },
   { href: '/knowledge', label: 'Conocimiento', icon: BookOpen, enabled: true },
   { href: '/settings/ai', label: 'IA', icon: Bot, enabled: true },
-  { href: '/flows', label: 'Flujos', icon: Workflow, enabled: false, phase: 'F4' },
+  { href: '/flows', label: 'Flujos', icon: Workflow, enabled: true },
   { href: '/settings/channels', label: 'Canales', icon: Instagram, enabled: true },
   { href: '/settings/team', label: 'Equipo', icon: Settings, enabled: true },
 ];
